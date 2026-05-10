@@ -10,9 +10,12 @@ namespace Common
         string StartSession(string meta);
 
         [OperationContract]
+        [FaultContract(typeof(ValidationFault))]
+        [FaultContract(typeof(DataFormatFault))]
         string PushSample(WeatherSample sample);
 
         [OperationContract]
         string EndSession();
+
     }
 }
