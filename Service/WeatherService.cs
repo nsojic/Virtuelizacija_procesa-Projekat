@@ -23,8 +23,17 @@ namespace Service
             return "IN_PROGRESS";
         }
 
-        public string StartSession(string meta)
+        public string StartSession(SessionMetadata meta)
         {
+            if (meta == null || meta.Headers == null)
+            {
+                throw new FaultException<ValidationFault>(
+                    new ValidationFault
+                    {
+                        Message = "Session metadata cannot be null"
+                    });
+            }
+
             Console.WriteLine("Session started");
 
             return "ACK";

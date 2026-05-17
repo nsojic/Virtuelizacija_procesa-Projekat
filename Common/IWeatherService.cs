@@ -7,7 +7,7 @@ namespace Common
     public interface IWeatherService
     {
         [OperationContract]
-        string StartSession(string meta);
+        string StartSession(SessionMetadata meta);
 
         [OperationContract]
         [FaultContract(typeof(ValidationFault))]
