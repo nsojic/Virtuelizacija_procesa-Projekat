@@ -1,21 +1,20 @@
 ﻿using System.ServiceModel;
 
-
 namespace Common
 {
     [ServiceContract]
     public interface IWeatherService
     {
         [OperationContract]
-        string StartSession(SessionMetadata meta);
+        ServiceResponse StartSession(SessionMetadata meta);
 
         [OperationContract]
         [FaultContract(typeof(ValidationFault))]
         [FaultContract(typeof(DataFormatFault))]
-        string PushSample(WeatherSample sample);
+        ServiceResponse PushSample(WeatherSample sample);
 
         [OperationContract]
-        string EndSession();
+        ServiceResponse EndSession();
 
     }
 }

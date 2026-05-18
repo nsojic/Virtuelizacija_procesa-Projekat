@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Common;
+﻿using Common;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.ServiceModel;
+using System.Text;
 
 namespace Client
 {
@@ -21,21 +18,18 @@ namespace Client
 
             var metadata = new SessionMetadata
             {
-                Headers = new List<string>
-                {
-                    "T",
-                    "Pressure",
-                    "Tpot",
-                    "Tdew",
-                    "Rh",
-                    "Sh",
-                    "Date"
-                }
+                T = "T",
+                Pressure = "Pressure",
+                Tpot = "Tpot",
+                Tdew = "Tdew",
+                Rh = "Rh",
+                Sh = "Sh",
+                Date = "Date"
             };
 
-            string startResponse = service.StartSession(metadata);
+            ServiceResponse startResponse = service.StartSession(metadata);
 
-            Console.WriteLine(startResponse);
+            Console.WriteLine($"{startResponse.Ack} - {startResponse.Status} - {startResponse.Message}");
 
             var samples = new List<WeatherSample>
             {
@@ -64,14 +58,14 @@ namespace Client
 
             for (int i = 0; i < samples.Count; i++)
             {
-                string response = service.PushSample(samples[i]);
+                ServiceResponse response = service.PushSample(samples[i]);
 
-                Console.WriteLine(response);
+                Console.WriteLine($"{response.Ack} - {response.Status} - {response.Message}");
             }
 
-            string endResponse = service.EndSession();
+            ServiceResponse endResponse = service.EndSession();
 
-            Console.WriteLine(endResponse);
+            Console.WriteLine($"{endResponse.Ack} - {endResponse.Status} - {endResponse.Message}");
         }
     }
 }

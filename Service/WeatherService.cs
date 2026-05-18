@@ -1,31 +1,103 @@
 ﻿using Common;
 using System;
 using System.ServiceModel;
-
+using System.Configuration;
 
 namespace Service
 {
     public class WeatherService : IWeatherService
     {
-        public string EndSession()
+        private bool sessionStarted = false;
+        private bool sessionCompleted = false;
+
+        private readonly double rhThreshold;
+        private readonly double tThreshold;
+        private readonly double dewThreshold;
+        private readonly double averageDeviationPercentage;
+
+        public WeatherService()
         {
+            rhThreshold = double.Parse(ConfigurationManager.AppSettings["RH_threshold"]);
+
+            tThreshold = double.Parse(ConfigurationManager.AppSettings["T_threshold"]);
+
+            dewThreshold = double.Parse(ConfigurationManager.AppSettings["DEW_threshold"]);
+
+            averageDeviationPercentage = double.Parse(
+                ConfigurationManager.AppSettings["AverageDeviationPercentage"]);
+        }
+        public ServiceResponse EndSession()
+        {
+            if (!sessionStarted)
+            {
+                return new ServiceResponse
+                {
+                    Ack = "NACK",
+                    Status = "FAILED",
+                    Message = "Session has not been started"
+                };
+            }
+
+            if (sessionCompleted)
+            {
+                return new ServiceResponse
+                {
+                    Ack = "NACK",
+                    Status = "FAILED",
+                    Message = "Session has already been completed"
+                };
+            }
+
             Console.WriteLine("Session ended");
 
-            return "COMPLETED";
+            sessionCompleted = true;
+            sessionStarted = false;
+
+            return new ServiceResponse
+            {
+                Ack = "ACK",
+                Status = "COMPLETED",
+                Message = "Session completed successfully"
+            };
         }
 
-        public string PushSample(WeatherSample sample)
+        public ServiceResponse PushSample(WeatherSample sample)
         {
+            if (!sessionStarted)
+            {
+                return new ServiceResponse
+                {
+                    Ack = "NACK",
+                    Status = "FAILED",
+                    Message = "Session has not been started"
+                };
+            }
+
+            if (sessionCompleted)
+            {
+                return new ServiceResponse
+                {
+                    Ack = "NACK",
+                    Status = "FAILED",
+                    Message = "Session has already been completed"
+                };
+            }
+
             ValidateSample(sample);
 
             Console.WriteLine($"Received sample T={sample.T}");
 
-            return "IN_PROGRESS";
+            return new ServiceResponse
+            {
+                Ack = "ACK",
+                Status = "IN_PROGRESS",
+                Message = "Sample received successfully"
+            };
         }
 
-        public string StartSession(SessionMetadata meta)
+        public ServiceResponse StartSession(SessionMetadata meta)
         {
-            if (meta == null || meta.Headers == null)
+            if (meta == null)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
@@ -34,9 +106,48 @@ namespace Service
                     });
             }
 
+            if (sessionStarted && !sessionCompleted)
+            {
+                return new ServiceResponse
+                {
+                    Ack = "NACK",
+                    Status = "FAILED",
+                    Message = "Session is already active"
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(meta.T) ||
+                string.IsNullOrWhiteSpace(meta.Pressure) ||
+                string.IsNullOrWhiteSpace(meta.Tpot) ||
+                string.IsNullOrWhiteSpace(meta.Tdew) ||
+                string.IsNullOrWhiteSpace(meta.Rh) ||
+                string.IsNullOrWhiteSpace(meta.Sh) ||
+                string.IsNullOrWhiteSpace(meta.Date))
+            {
+                return new ServiceResponse
+                {
+                    Ack = "NACK",
+                    Status = "FAILED",
+                    Message = "All metadata fields are required"
+                };
+            }
+
             Console.WriteLine("Session started");
 
-            return "ACK";
+            Console.WriteLine($"T threshold: {tThreshold}");
+            Console.WriteLine($"RH threshold: {rhThreshold}");
+            Console.WriteLine($"DEW threshold: {dewThreshold}");
+            Console.WriteLine($"Average deviation percentage: {averageDeviationPercentage}%");
+
+            sessionStarted = true;
+            sessionCompleted = false;
+
+            return new ServiceResponse
+            {
+                Ack = "ACK",
+                Status = "IN_PROGRESS",
+                Message = "Session started successfully"
+            };
         }
 
         private void ValidateSample(WeatherSample sample)
