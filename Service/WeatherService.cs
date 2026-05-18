@@ -201,6 +201,16 @@ namespace Service
                     });
             }
 
+            // Potencijalna temperatura
+            if (sample.Tpot < -80 || sample.Tpot > 60)
+            {
+                throw new FaultException<ValidationFault>(
+                    new ValidationFault
+                    {
+                        Message = "Potential temperature must be between -80 and 60 degrees Celsius"
+                    });
+            }
+
             // Specifična vlažnost
             if (sample.Sh < 0 || sample.Sh > 50)
             {
