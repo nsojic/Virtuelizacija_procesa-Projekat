@@ -43,6 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="WeatherFileHandler.cs" />
     <Compile Include="DataFormatFault.cs" />
     <Compile Include="IWeatherService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -5,6 +5,7 @@ using System.Configuration;
 
 namespace Service
 {
+    [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
     public class WeatherService : IWeatherService
     {
         private bool sessionStarted = false;
@@ -85,7 +86,14 @@ namespace Service
 
             ValidateSample(sample);
 
-            Console.WriteLine($"Received sample T={sample.T}");
+            Console.WriteLine($"Received sample -> " +
+                     $"Date={sample.Date}, " +
+                     $"T={sample.T}, " +
+                     $"Pressure={sample.Pressure}, " +
+                     $"Tpot={sample.Tpot}, " +
+                     $"Tdew={sample.Tdew}, " +
+                     $"Rh={sample.Rh}, " +
+                     $"Sh={sample.Sh}");
 
             return new ServiceResponse
             {
@@ -202,12 +210,12 @@ namespace Service
             }
 
             // Potencijalna temperatura
-            if (sample.Tpot < -80 || sample.Tpot > 60)
+            if (sample.Tpot < -80 || sample.Tpot > 400)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
-                        Message = "Potential temperature must be between -80 and 60 degrees Celsius"
+                        Message = "Potential temperature must be between -80 and 400 degrees Celsius"
                     });
             }
 

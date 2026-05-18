@@ -1,11 +1,12 @@
 ﻿using Common;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.ServiceModel;
 using System.Text;
-using System.IO;
-using System.Globalization;
 
 namespace Client
 {
@@ -13,15 +14,11 @@ namespace Client
     {
         static void Main(string[] args)
         {
-            ChannelFactory<IWeatherService> factory =
-            new ChannelFactory<IWeatherService>("WeatherService");
+            ChannelFactory<IWeatherService> factory = new ChannelFactory<IWeatherService>("WeatherService");
 
             IWeatherService service = factory.CreateChannel();
 
-            string csvPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory,
-                "Data",
-                "weather.csv");
+            string csvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Data","weather.csv");
 
             if (!File.Exists(csvPath))
             {
@@ -29,9 +26,14 @@ namespace Client
                 return;
             }
 
-            string rejectLogPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory,
-                "rejects.log");
+            string logsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Logs");
+
+            if (!Directory.Exists(logsPath))
+            {
+                Directory.CreateDirectory(logsPath);
+            }
+
+            string rejectLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "rejects.csv");
 
             if (File.Exists(rejectLogPath))
             {
@@ -40,9 +42,40 @@ namespace Client
 
             List<WeatherSample> samples = new List<WeatherSample>();
 
-            using (StreamReader reader = new StreamReader(csvPath))
+            using (WeatherFileHandler handler = new WeatherFileHandler(csvPath))
             {
+                StreamReader reader = handler.OpenReader();
+
                 string headerLine = reader.ReadLine();
+
+                string[] headers = headerLine.Split(',');
+
+                Dictionary<string, int> columnIndexes = new Dictionary<string, int>();
+
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    columnIndexes[headers[i].Trim()] = i;
+                }
+
+                string[] requiredColumns = {
+                                            "date",
+                                            "p",
+                                            "T",
+                                            "Tpot",
+                                            "Tdew",
+                                            "rh",
+                                            "sh"
+                                        };
+
+                foreach (string column in requiredColumns)
+                {
+                    if (!columnIndexes.ContainsKey(column))
+                    {
+                        Console.WriteLine($"Missing required column: {column}");
+
+                        return;
+                    }
+                }
 
                 string line;
 
@@ -52,46 +85,37 @@ namespace Client
                 {
                     string[] values = line.Split(',');
 
-                    if (values.Length < 10)
-                    {
-                        File.AppendAllText(
-                            rejectLogPath,
-                            $"Invalid column count: {line}{Environment.NewLine}");
-
-                        continue;
-                    }
-
                     try
                     {
                         WeatherSample sample = new WeatherSample
                         {
                             Date = DateTime.ParseExact(
-                            values[0],
+                            values[columnIndexes["date"]],
                             "yyyy-MM-dd HH:mm:ss",
                             CultureInfo.InvariantCulture),
 
                             Pressure = double.Parse(
-                            values[1],
+                            values[columnIndexes["p"]],
                             CultureInfo.InvariantCulture),
 
                             T = double.Parse(
-                            values[2],
+                            values[columnIndexes["T"]],
                             CultureInfo.InvariantCulture),
 
                             Tpot = double.Parse(
-                            values[3],
+                            values[columnIndexes["Tpot"]],
                             CultureInfo.InvariantCulture),
 
                             Tdew = double.Parse(
-                            values[4],
+                            values[columnIndexes["Tdew"]],
                             CultureInfo.InvariantCulture),
 
                             Rh = double.Parse(
-                            values[5],
+                            values[columnIndexes["rh"]],
                             CultureInfo.InvariantCulture),
 
                             Sh = double.Parse(
-                            values[9],
+                            values[columnIndexes["sh"]],
                             CultureInfo.InvariantCulture)
                         };
 
@@ -106,9 +130,7 @@ namespace Client
                     }
                     catch (Exception ex)
                     {
-                        File.AppendAllText(
-                            rejectLogPath,
-                            $"Parsing error: {line} | Error: {ex.Message}{Environment.NewLine}");
+                        handler.WriteReject("Parsing error",line, ex.Message);
                     }
                 }
             }
@@ -130,9 +152,45 @@ namespace Client
 
             for (int i = 0; i < samples.Count; i++)
             {
-                ServiceResponse response = service.PushSample(samples[i]);
+                if (i == 5)
+                {
+                    Console.WriteLine(
+                        "Simulated connection interruption.");
 
-                Console.WriteLine($"{response.Ack} - {response.Status} - {response.Message}");
+                    break;
+                }
+
+                try
+                {
+                    ServiceResponse response =
+                        service.PushSample(samples[i]);
+
+                    Console.WriteLine($"{response.Ack} - " + $"{response.Status} - " + $"{response.Message}");
+                }
+                catch (FaultException<ValidationFault> ex)
+                {
+                    Console.WriteLine($"Validation error: {ex.Detail.Message}");
+
+                    using (WeatherFileHandler handler = new WeatherFileHandler(""))
+                    {
+                        handler.WriteReject(
+                            "Validation error",
+                            samples[i].ToString(),
+                            ex.Detail.Message);
+                    }
+                }
+                catch (FaultException<DataFormatFault> ex)
+                {
+                    Console.WriteLine($"Format error: {ex.Detail.Message}");
+
+                    using (WeatherFileHandler handler = new WeatherFileHandler(""))
+                    {
+                        handler.WriteReject(
+                            "Format error",
+                            samples[i].ToString(),
+                            ex.Detail.Message);
+                    }
+                }
             }
 
             ServiceResponse endResponse = service.EndSession();
