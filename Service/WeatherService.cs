@@ -2,6 +2,7 @@
 using System;
 using System.ServiceModel;
 using System.Configuration;
+using System.Globalization;
 
 namespace Service
 {
@@ -190,7 +191,7 @@ namespace Service
             }
 
             // Relativna vlažnost
-            if (sample.Rh < 0 || sample.Rh > 100)
+            if (sample.Rh <= 0 || sample.Rh > 100)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault

@@ -40,7 +40,23 @@ namespace Client
                 File.Delete(rejectLogPath);
             }
 
-            List<WeatherSample> samples = new List<WeatherSample>();
+            var metadata = new SessionMetadata
+            {
+                T = "T",
+                Pressure = "Pressure",
+                Tpot = "Tpot",
+                Tdew = "Tdew",
+                Rh = "Rh",
+                Sh = "Sh",
+                Date = "Date"
+            };
+
+            ServiceResponse startResponse = service.StartSession(metadata);
+
+            Console.WriteLine(
+                $"{startResponse.Ack} - " +
+                $"{startResponse.Status} - " +
+                $"{startResponse.Message}");
 
             using (WeatherFileHandler handler = new WeatherFileHandler(csvPath))
             {
@@ -119,7 +135,13 @@ namespace Client
                             CultureInfo.InvariantCulture)
                         };
 
-                        samples.Add(sample);
+                        ServiceResponse response =
+                            service.PushSample(sample);
+
+                        Console.WriteLine(
+                            $"{response.Ack} - " +
+                            $"{response.Status} - " +
+                            $"{response.Message}");
 
                         rowCount++;
 
@@ -135,65 +157,8 @@ namespace Client
                 }
             }
 
-            var metadata = new SessionMetadata
-            {
-                T = "T",
-                Pressure = "Pressure",
-                Tpot = "Tpot",
-                Tdew = "Tdew",
-                Rh = "Rh",
-                Sh = "Sh",
-                Date = "Date"
-            };
-
-            ServiceResponse startResponse = service.StartSession(metadata);
-
-            Console.WriteLine($"{startResponse.Ack} - {startResponse.Status} - {startResponse.Message}");
-
-            for (int i = 0; i < samples.Count; i++)
-            {
-                if (i == 5)
-                {
-                    Console.WriteLine(
-                        "Simulated connection interruption.");
-
-                    break;
-                }
-
-                try
-                {
-                    ServiceResponse response =
-                        service.PushSample(samples[i]);
-
-                    Console.WriteLine($"{response.Ack} - " + $"{response.Status} - " + $"{response.Message}");
-                }
-                catch (FaultException<ValidationFault> ex)
-                {
-                    Console.WriteLine($"Validation error: {ex.Detail.Message}");
-
-                    using (WeatherFileHandler handler = new WeatherFileHandler(""))
-                    {
-                        handler.WriteReject(
-                            "Validation error",
-                            samples[i].ToString(),
-                            ex.Detail.Message);
-                    }
-                }
-                catch (FaultException<DataFormatFault> ex)
-                {
-                    Console.WriteLine($"Format error: {ex.Detail.Message}");
-
-                    using (WeatherFileHandler handler = new WeatherFileHandler(""))
-                    {
-                        handler.WriteReject(
-                            "Format error",
-                            samples[i].ToString(),
-                            ex.Detail.Message);
-                    }
-                }
-            }
-
-            ServiceResponse endResponse = service.EndSession();
+            ServiceResponse endResponse =
+                service.EndSession();
 
             Console.WriteLine($"{endResponse.Ack} - {endResponse.Status} - {endResponse.Message}");
         }
