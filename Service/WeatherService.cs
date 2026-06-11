@@ -3,6 +3,7 @@ using System;
 using System.ServiceModel;
 using System.Configuration;
 using System.Globalization;
+using System.IO;
 
 namespace Service
 {
@@ -17,16 +18,19 @@ namespace Service
         private readonly double dewThreshold;
         private readonly double averageDeviationPercentage;
 
+        private string sessionFolder;
+        private string measurementsFilePath;
+        private string rejectsFilePath;
+
         public WeatherService()
         {
-            rhThreshold = double.Parse(ConfigurationManager.AppSettings["RH_threshold"]);
+            rhThreshold = double.Parse(ConfigurationManager.AppSettings["RH_threshold"], CultureInfo.InvariantCulture);
 
-            tThreshold = double.Parse(ConfigurationManager.AppSettings["T_threshold"]);
+            tThreshold = double.Parse(ConfigurationManager.AppSettings["T_threshold"], CultureInfo.InvariantCulture);
 
-            dewThreshold = double.Parse(ConfigurationManager.AppSettings["DEW_threshold"]);
+            dewThreshold = double.Parse(ConfigurationManager.AppSettings["DEW_threshold"], CultureInfo.InvariantCulture);
 
-            averageDeviationPercentage = double.Parse(
-                ConfigurationManager.AppSettings["AverageDeviationPercentage"]);
+            averageDeviationPercentage = double.Parse(ConfigurationManager.AppSettings["AverageDeviationPercentage"], CultureInfo.InvariantCulture);
         }
         public ServiceResponse EndSession()
         {
@@ -85,7 +89,41 @@ namespace Service
                 };
             }
 
-            ValidateSample(sample);
+            try
+            {
+                ValidateSample(sample);
+            }
+            catch (Exception ex)
+            {
+                using (StreamWriter writer =
+                    new StreamWriter(rejectsFilePath, true))
+                {
+                    writer.WriteLine(
+                        $"{sample?.Date}," +
+                        $"{sample?.T}," +
+                        $"{sample?.Pressure}," +
+                        $"{sample?.Tpot}," +
+                        $"{sample?.Tdew}," +
+                        $"{sample?.Rh}," +
+                        $"{sample?.Sh}," +
+                        $"{ex.Message}");
+                }
+
+                throw;
+            }
+
+            using (StreamWriter writer =
+            new StreamWriter(measurementsFilePath, true))
+            {
+                writer.WriteLine(
+                    $"{sample.Date}," +
+                    $"{sample.T}," +
+                    $"{sample.Pressure}," +
+                    $"{sample.Tpot}," +
+                    $"{sample.Tdew}," +
+                    $"{sample.Rh}," +
+                    $"{sample.Sh}");
+            }
 
             Console.WriteLine($"Received sample -> " +
                      $"Date={sample.Date}, " +
@@ -139,6 +177,35 @@ namespace Service
                     Status = "FAILED",
                     Message = "All metadata fields are required"
                 };
+            }
+
+            sessionFolder = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                "Sessions");
+
+            if (!Directory.Exists(sessionFolder))
+            {
+                Directory.CreateDirectory(sessionFolder);
+            }
+
+            measurementsFilePath =
+                Path.Combine(sessionFolder, "measurements_session.csv");
+
+            rejectsFilePath =
+                Path.Combine(sessionFolder, "rejects.csv");
+
+            using (StreamWriter writer =
+            new StreamWriter(measurementsFilePath, false))
+            {
+                writer.WriteLine(
+                    "Date,T,Pressure,Tpot,Tdew,Rh,Sh");
+            }
+
+            using (StreamWriter writer =
+            new StreamWriter(rejectsFilePath, false))
+            {
+                writer.WriteLine(
+                    "Date,T,Pressure,Tpot,Tdew,Rh,Sh,Reason");
             }
 
             Console.WriteLine("Session started");
