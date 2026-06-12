@@ -22,6 +22,8 @@ namespace Service
         private string measurementsFilePath;
         private string rejectsFilePath;
 
+        private int receivedSamples = 0;
+
         public WeatherService()
         {
             rhThreshold = double.Parse(ConfigurationManager.AppSettings["RH_threshold"], CultureInfo.InvariantCulture);
@@ -54,7 +56,7 @@ namespace Service
                 };
             }
 
-            Console.WriteLine("Session ended");
+            Console.WriteLine($"Transfer completed. Samples received: {receivedSamples}");
 
             sessionCompleted = true;
             sessionStarted = false;
@@ -125,14 +127,8 @@ namespace Service
                     $"{sample.Sh}");
             }
 
-            Console.WriteLine($"Received sample -> " +
-                     $"Date={sample.Date}, " +
-                     $"T={sample.T}, " +
-                     $"Pressure={sample.Pressure}, " +
-                     $"Tpot={sample.Tpot}, " +
-                     $"Tdew={sample.Tdew}, " +
-                     $"Rh={sample.Rh}, " +
-                     $"Sh={sample.Sh}");
+            Console.WriteLine($"Transfer in progress... " + $"Sample received: {sample.Date}");
+            receivedSamples++;
 
             return new ServiceResponse
             {
@@ -208,13 +204,15 @@ namespace Service
                     "Date,T,Pressure,Tpot,Tdew,Rh,Sh,Reason");
             }
 
-            Console.WriteLine("Session started");
+            Console.WriteLine("Transfer started");
+            Console.WriteLine("Transfer in progress...");
 
             Console.WriteLine($"T threshold: {tThreshold}");
             Console.WriteLine($"RH threshold: {rhThreshold}");
             Console.WriteLine($"DEW threshold: {dewThreshold}");
             Console.WriteLine($"Average deviation percentage: {averageDeviationPercentage}%");
 
+            receivedSamples = 0;
             sessionStarted = true;
             sessionCompleted = false;
 
