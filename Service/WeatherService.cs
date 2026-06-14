@@ -25,6 +25,12 @@ namespace Service
 
         private int receivedSamples = 0;
 
+        private double? previousTemperature = null;
+
+        private double temperatureSum = 0;
+
+        private int temperatureCount = 0;
+
         private readonly WeatherEventManager eventManager;
 
         public WeatherService()
@@ -111,6 +117,8 @@ namespace Service
             try
             {
                 ValidateSample(sample);
+
+                CheckTemperatureAnalytics(sample);
             }
             catch (Exception ex)
             {
@@ -216,6 +224,10 @@ namespace Service
             Console.WriteLine($"RH threshold: {rhThreshold}");
             Console.WriteLine($"DEW threshold: {dewThreshold}");
             Console.WriteLine($"Average deviation percentage: {averageDeviationPercentage}%");
+
+            previousTemperature = null;
+            temperatureSum = 0;
+            temperatureCount = 0;
 
             receivedSamples = 0;
             sessionStarted = true;
@@ -325,6 +337,47 @@ namespace Service
                     });
             }
 
+        }
+
+        private void CheckTemperatureAnalytics(WeatherSample sample)
+        {
+            if (previousTemperature.HasValue)
+            {
+                double deltaT = sample.T - previousTemperature.Value;
+
+                if (Math.Abs(deltaT) > tThreshold)
+                {
+                    string direction = deltaT > 0
+                        ? "above expected"
+                        : "below expected";
+
+                    eventManager.RaiseWarning($"TemperatureSpike detected. " + $"ΔT = {deltaT:F2} ({direction})");
+                }
+            }
+
+            temperatureSum += sample.T;
+
+            temperatureCount++;
+
+            double meanTemperature = temperatureSum / temperatureCount;
+
+            double deviation = Math.Abs(meanTemperature) * (averageDeviationPercentage / 100.0);
+
+            double lowerLimit = meanTemperature - deviation;
+
+            double upperLimit =meanTemperature + deviation;
+
+            if (sample.T < lowerLimit)
+            {
+                eventManager.RaiseWarning($"Temperature below expected value. " + $"T = {sample.T:F2}");
+            }
+
+            if (sample.T > upperLimit)
+            {
+                eventManager.RaiseWarning($"Temperature above expected value. " + $"T = {sample.T:F2}");
+            }
+
+            previousTemperature = sample.T;
         }
     }
 }
