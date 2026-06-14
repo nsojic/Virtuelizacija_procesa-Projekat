@@ -25,8 +25,20 @@ namespace Service
 
         private int receivedSamples = 0;
 
+        private readonly WeatherEventManager eventManager;
+
         public WeatherService()
         {
+            eventManager = new WeatherEventManager();
+
+            eventManager.OnTransferStarted += (s, e) => Console.WriteLine($"EVENT: {e.Message}");
+
+            eventManager.OnSampleReceived += (s, e) => Console.WriteLine($"EVENT: {e.Message}");
+
+            eventManager.OnTransferCompleted += (s, e) => Console.WriteLine($"EVENT: {e.Message}");
+
+            eventManager.OnWarningRaised += (s, e) => Console.WriteLine($"WARNING: {e.Message}");
+           
             rhThreshold = double.Parse(ConfigurationManager.AppSettings["RH_threshold"], CultureInfo.InvariantCulture);
 
             tThreshold = double.Parse(ConfigurationManager.AppSettings["T_threshold"], CultureInfo.InvariantCulture);
@@ -61,7 +73,8 @@ namespace Service
             sessionWriter = null;
 
             Console.WriteLine($"Transfer completed. Samples received: {receivedSamples}");
-
+            eventManager.RaiseTransferCompleted($"Transfer completed. Samples received: {receivedSamples}");
+            
             sessionCompleted = true;
             sessionStarted = false;
 
@@ -132,6 +145,7 @@ namespace Service
                  $"{sample.Sh}");
 
             Console.WriteLine($"Transfer in progress... " + $"Sample received: {sample.Date}");
+            eventManager.RaiseSampleReceived($"Sample received: {sample.Date}");
             receivedSamples++;
 
             return new ServiceResponse
@@ -196,6 +210,8 @@ namespace Service
             Console.WriteLine("Transfer started");
             Console.WriteLine("Transfer in progress...");
 
+            eventManager.RaiseTransferStarted("Transfer started successfully");
+
             Console.WriteLine($"T threshold: {tThreshold}");
             Console.WriteLine($"RH threshold: {rhThreshold}");
             Console.WriteLine($"DEW threshold: {dewThreshold}");
@@ -227,6 +243,7 @@ namespace Service
             // Temperatura
             if (sample.T < -10 || sample.T > 35)
             {
+                eventManager.RaiseWarning( $"Temperature out of range: {sample.T}");
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
@@ -237,6 +254,7 @@ namespace Service
             // Pritisak
             if (sample.Pressure < 900 || sample.Pressure > 1100)
             {
+                eventManager.RaiseWarning($"Pressure out of range: {sample.Pressure}");
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
@@ -247,6 +265,7 @@ namespace Service
             // Relativna vlažnost
             if (sample.Rh < 75 || sample.Rh > 100)
             {
+                eventManager.RaiseWarning($"Relative humidity out of range: {sample.Rh}");
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
@@ -257,6 +276,7 @@ namespace Service
             // Temperatura rosišta
             if (sample.Tdew < -10 || sample.Tdew > 10)
             {
+                eventManager.RaiseWarning($"Dew point out of range: {sample.Tdew}");
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
@@ -267,6 +287,7 @@ namespace Service
             // Potencijalna temperatura
             if (sample.Tpot < 250 || sample.Tpot > 350)
             {
+                eventManager.RaiseWarning($"Potential temperature out of range: {sample.Tpot}");
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
@@ -277,6 +298,7 @@ namespace Service
             // Specifična vlažnost
             if (sample.Sh < 0 || sample.Sh > 30)
             {
+                eventManager.RaiseWarning($"Specific humidity out of range: {sample.Sh}");
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
