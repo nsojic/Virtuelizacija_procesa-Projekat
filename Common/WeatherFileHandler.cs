@@ -35,47 +35,73 @@ namespace Common
             }
         }
 
-        public void WriteReject(string errorType, string row, string message)
+        
+           public void WriteReject(string errorType, string row, string message)
         {
             try
             {
-                rejectWriter = new StreamWriter(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "rejects.csv"), true);
+                string path = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    "Logs",
+                    "rejects.csv");
 
-                rejectWriter.WriteLine($"{errorType},{row},{message}");
-
-                rejectWriter.Flush();
+                using (StreamWriter writer = new StreamWriter(path, true))
+                {
+                    writer.WriteLine($"{errorType},{row},{message}");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(
-                    $"Reject log error: {ex.Message}");
+                Console.WriteLine($"Reject log error: {ex.Message}");
             }
         }
+        
+
+        private bool disposed = false;
 
         public void Dispose()
-        { 
-            try
-            {
-                if (reader != null)
-                { 
-                    reader.Close();
-                    reader.Dispose();
-                    reader = null;
-                }
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
 
-                if (rejectWriter != null)
-                { 
-                    rejectWriter.Close();
-                    rejectWriter.Dispose();
-                    rejectWriter = null;
-                }
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposed)
+                return;
 
-                Console.WriteLine("Resources successfully released.");
-            }
-            catch (Exception ex)
+            if (disposing)
             {
-                Console.WriteLine($"Dispose error: {ex.Message}");
+                try
+                {
+                    if (reader != null)
+                    {
+                        reader.Close();
+                        reader.Dispose();
+                        reader = null;
+                    }
+
+                    if (rejectWriter != null)
+                    {
+                        rejectWriter.Close();
+                        rejectWriter.Dispose();
+                        rejectWriter = null;
+                    }
+
+                    Console.WriteLine("Resources successfully released.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Dispose error: {ex.Message}");
+                }
             }
+
+            disposed = true;
+        }
+
+        ~WeatherFileHandler()
+        {
+            Dispose(false);
         }
     }
 }

@@ -150,17 +150,36 @@ namespace Client
                             break;
                         }
                     }
+                    catch (FaultException<ValidationFault> ex)
+                    {
+                        handler.WriteReject(
+                            "Validation error",
+                            line,
+                            ex.Detail.Message);
+
+                        Console.WriteLine($"NACK - REJECTED - {ex.Detail.Message}");
+
+                        continue;
+                    }
                     catch (Exception ex)
                     {
                         handler.WriteReject("Parsing error",line, ex.Message);
                     }
                 }
             }
+            try
+            {
+                ServiceResponse endResponse = service.EndSession();
 
-            ServiceResponse endResponse =
-                service.EndSession();
-
-            Console.WriteLine($"{endResponse.Ack} - {endResponse.Status} - {endResponse.Message}");
+                Console.WriteLine(
+                    $"{endResponse.Ack} - " +
+                    $"{endResponse.Status} - " +
+                    $"{endResponse.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"EndSession error: {ex.Message}");
+            }
         }
     }
 }

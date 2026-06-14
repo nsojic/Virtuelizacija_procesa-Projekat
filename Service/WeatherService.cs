@@ -21,6 +21,7 @@ namespace Service
         private string sessionFolder;
         private string measurementsFilePath;
         private string rejectsFilePath;
+        private SessionFileWriter sessionWriter;
 
         private int receivedSamples = 0;
 
@@ -55,6 +56,9 @@ namespace Service
                     Message = "Session has already been completed"
                 };
             }
+
+            sessionWriter?.Dispose();
+            sessionWriter = null;
 
             Console.WriteLine($"Transfer completed. Samples received: {receivedSamples}");
 
@@ -97,35 +101,35 @@ namespace Service
             }
             catch (Exception ex)
             {
-                using (StreamWriter writer =
-                    new StreamWriter(rejectsFilePath, true))
+
+                string message = ex.Message;
+
+                if (ex is FaultException<ValidationFault> vf)
                 {
-                    writer.WriteLine(
-                        $"{sample?.Date}," +
-                        $"{sample?.T}," +
-                        $"{sample?.Pressure}," +
-                        $"{sample?.Tpot}," +
-                        $"{sample?.Tdew}," +
-                        $"{sample?.Rh}," +
-                        $"{sample?.Sh}," +
-                        $"{ex.Message}");
+                    message = vf.Detail.Message;
                 }
 
-                throw;
-            }
-
-            using (StreamWriter writer =
-            new StreamWriter(measurementsFilePath, true))
-            {
-                writer.WriteLine(
+                sessionWriter.WriteReject(
                     $"{sample.Date}," +
                     $"{sample.T}," +
                     $"{sample.Pressure}," +
                     $"{sample.Tpot}," +
                     $"{sample.Tdew}," +
                     $"{sample.Rh}," +
-                    $"{sample.Sh}");
+                    $"{sample.Sh}," +
+                    $"{message}");
+
+                throw;
             }
+
+            sessionWriter.WriteMeasurement(
+                 $"{sample.Date}," +
+                 $"{sample.T}," +
+                 $"{sample.Pressure}," +
+                 $"{sample.Tpot}," +
+                 $"{sample.Tdew}," +
+                 $"{sample.Rh}," +
+                 $"{sample.Sh}");
 
             Console.WriteLine($"Transfer in progress... " + $"Sample received: {sample.Date}");
             receivedSamples++;
@@ -175,34 +179,19 @@ namespace Service
                 };
             }
 
-            sessionFolder = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory,
-                "Sessions");
+            sessionFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Sessions");
 
             if (!Directory.Exists(sessionFolder))
             {
                 Directory.CreateDirectory(sessionFolder);
             }
 
-            measurementsFilePath =
-                Path.Combine(sessionFolder, "measurements_session.csv");
+            measurementsFilePath = Path.Combine(sessionFolder, "measurements_session.csv");
 
-            rejectsFilePath =
-                Path.Combine(sessionFolder, "rejects.csv");
+            rejectsFilePath = Path.Combine(sessionFolder, "rejects.csv");
 
-            using (StreamWriter writer =
-            new StreamWriter(measurementsFilePath, false))
-            {
-                writer.WriteLine(
-                    "Date,T,Pressure,Tpot,Tdew,Rh,Sh");
-            }
-
-            using (StreamWriter writer =
-            new StreamWriter(rejectsFilePath, false))
-            {
-                writer.WriteLine(
-                    "Date,T,Pressure,Tpot,Tdew,Rh,Sh,Reason");
-            }
+            sessionWriter?.Dispose();
+            sessionWriter = new SessionFileWriter(measurementsFilePath, rejectsFilePath);
 
             Console.WriteLine("Transfer started");
             Console.WriteLine("Transfer in progress...");
@@ -235,63 +224,63 @@ namespace Service
                     });
             }
 
-            // Temperatura 
-            if (sample.T < -80 || sample.T > 60)
+            // Temperatura
+            if (sample.T < -10 || sample.T > 35)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
-                        Message = "Temperature must be between -80 and 60 degrees Celsius"
+                        Message = "Temperature must be between -10 and 35 degrees Celsius"
                     });
             }
 
             // Pritisak
-            if (sample.Pressure < 800 || sample.Pressure > 1200)
+            if (sample.Pressure < 900 || sample.Pressure > 1100)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
-                        Message = "Pressure must be between 800 and 1200 hPa"
+                        Message = "Pressure must be between 900 and 1100 hPa"
                     });
             }
 
             // Relativna vlažnost
-            if (sample.Rh <= 0 || sample.Rh > 100)
+            if (sample.Rh < 75 || sample.Rh > 100)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
-                        Message = "Relative humidity must be between 0 and 100%"
+                        Message = "Relative humidity must be between 75 and 100%"
                     });
             }
 
             // Temperatura rosišta
-            if (sample.Tdew < -80 || sample.Tdew > 60)
+            if (sample.Tdew < -10 || sample.Tdew > 10)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
-                        Message = "Dew point must be between -80 and 60 degrees Celsius"
+                        Message = "Dew point must be between -10 and 10 degrees Celsius"
                     });
             }
 
             // Potencijalna temperatura
-            if (sample.Tpot < -80 || sample.Tpot > 400)
+            if (sample.Tpot < 250 || sample.Tpot > 350)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
-                        Message = "Potential temperature must be between -80 and 400 degrees Celsius"
+                        Message = "Potential temperature must be between 250 and 350 K"
                     });
             }
 
             // Specifična vlažnost
-            if (sample.Sh < 0 || sample.Sh > 50)
+            if (sample.Sh < 0 || sample.Sh > 30)
             {
                 throw new FaultException<ValidationFault>(
                     new ValidationFault
                     {
-                        Message = "Specific humidity must be between 0 and 50 g/kg"
+                        Message = "Specific humidity must be between 0 and 30 g/kg"
                     });
             }
 
