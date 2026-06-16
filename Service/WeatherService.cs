@@ -46,7 +46,26 @@ namespace Service
             eventManager.OnTransferCompleted += (s, e) => Console.WriteLine($"EVENT: {e.Message}");
 
             eventManager.OnWarningRaised += (s, e) => Console.WriteLine($"WARNING: {e.Message}");
-           
+
+            string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "events.log");
+
+            if (!Directory.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs")))
+            {
+                Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs"));
+            }
+
+            eventManager.OnWarningRaised += (s, e) =>
+                File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] WARNING: {e.Message}{Environment.NewLine}");
+
+            eventManager.OnTransferStarted += (s, e) =>
+                File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] STARTED: {e.Message}{Environment.NewLine}");
+
+            eventManager.OnTransferCompleted += (s, e) =>
+                File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] COMPLETED: {e.Message}{Environment.NewLine}");
+
             rhThreshold = double.Parse(ConfigurationManager.AppSettings["RH_threshold"], CultureInfo.InvariantCulture);
 
             tThreshold = double.Parse(ConfigurationManager.AppSettings["T_threshold"], CultureInfo.InvariantCulture);
@@ -119,8 +138,6 @@ namespace Service
             try
             {
                 ValidateSample(sample);
-
-                CheckTemperatureAnalytics(sample);
             }
             catch (Exception ex)
             {
@@ -145,6 +162,7 @@ namespace Service
                 throw;
             }
 
+            CheckAnalytics(sample);
             sessionWriter.WriteMeasurement(
                  $"{sample.Date}," +
                  $"{sample.T}," +
@@ -344,7 +362,7 @@ namespace Service
 
         }
 
-        private void CheckTemperatureAnalytics(WeatherSample sample)
+        private void CheckAnalytics(WeatherSample sample)
         {
             if (previousTemperature.HasValue)
             {
@@ -364,11 +382,8 @@ namespace Service
 
             double meanTemperature = temperatureSum / temperatureCount;
 
-            double deviation = Math.Abs(meanTemperature) * (averageDeviationPercentage / 100.0);
-
-            double lowerLimit = meanTemperature - deviation;
-
-            double upperLimit =meanTemperature + deviation;
+            double lowerLimit = Math.Min(meanTemperature * 0.75, meanTemperature * 1.25);
+            double upperLimit = Math.Max(meanTemperature * 0.75, meanTemperature * 1.25);
 
             if (previousRh.HasValue)
             {
