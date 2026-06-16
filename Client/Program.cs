@@ -152,13 +152,14 @@ namespace Client
                     }
                     catch (FaultException<ValidationFault> ex)
                     {
-                        handler.WriteReject(
-                            "Validation error",
-                            line,
-                            ex.Detail.Message);
-
+                        handler.WriteReject("Validation error", line, ex.Detail.Message);
                         Console.WriteLine($"NACK - REJECTED - {ex.Detail.Message}");
-
+                        continue;
+                    }
+                    catch (FaultException<DataFormatFault> ex)  // ← DODAJ OVO
+                    {
+                        handler.WriteReject("Data format error", line, ex.Detail.Message);
+                        Console.WriteLine($"NACK - FORMAT ERROR - {ex.Detail.Message}");
                         continue;
                     }
                     catch (Exception ex)

@@ -26,6 +26,8 @@ namespace Service
         private int receivedSamples = 0;
 
         private double? previousTemperature = null;
+        private double? previousRh = null;
+        private double? previousDew = null;
 
         private double temperatureSum = 0;
 
@@ -229,6 +231,9 @@ namespace Service
             temperatureSum = 0;
             temperatureCount = 0;
 
+            previousRh = null;
+            previousDew = null;
+
             receivedSamples = 0;
             sessionStarted = true;
             sessionCompleted = false;
@@ -347,11 +352,9 @@ namespace Service
 
                 if (Math.Abs(deltaT) > tThreshold)
                 {
-                    string direction = deltaT > 0
-                        ? "above expected"
-                        : "below expected";
+                    string direction = deltaT > 0 ? "Higher than expected" : "Lower than expected";
 
-                    eventManager.RaiseWarning($"TemperatureSpike detected. " + $"ΔT = {deltaT:F2} ({direction})");
+                    eventManager.RaiseWarning($"Temperature spike detected. DeltaT = {deltaT:F2} ({direction})");
                 }
             }
 
@@ -367,6 +370,32 @@ namespace Service
 
             double upperLimit =meanTemperature + deviation;
 
+            if (previousRh.HasValue)
+            {
+                double deltaRh = sample.Rh - previousRh.Value;
+
+                if (Math.Abs(deltaRh) > rhThreshold)
+                {
+                    string direction = deltaRh > 0 ? "Higher than expected" : "Lower than expected";
+
+                    eventManager.RaiseWarning(
+                        $"Humidity spike detected. Delta RH = {deltaRh:F2} ({direction})");
+                }
+            }
+
+            if (previousDew.HasValue)
+            {
+                double deltaDew = sample.Tdew - previousDew.Value;
+
+                if (Math.Abs(deltaDew) > dewThreshold)
+                {
+                    string direction = deltaDew > 0 ? "Higher than expected" : "Lower than expected";
+
+                    eventManager.RaiseWarning(
+                        $"Dew point spike detected. Delta DEW = {deltaDew:F2} ({direction})");
+                }
+            }
+
             if (sample.T < lowerLimit)
             {
                 eventManager.RaiseWarning($"Temperature below expected value. " + $"T = {sample.T:F2}");
@@ -378,6 +407,8 @@ namespace Service
             }
 
             previousTemperature = sample.T;
+            previousRh = sample.Rh;
+            previousDew = sample.Tdew;
         }
     }
 }
